@@ -1,0 +1,55 @@
+name: Update Twikoo Vercel
+
+on:
+  schedule:
+    - cron: "0 9 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update-twikoo-vercel:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601856ffabcc48e # v4.3.0
+        with:
+          node-version: 22
+
+      - name: Get latest twikoo-vercel version
+        id: latest
+        run: |
+          LATEST=$(npm view twikoo-vercel version)
+          echo "version=$LATEST" >> "$GITHUB_OUTPUT"
+          echo "Latest twikoo-vercel version: $LATEST"
+
+      - name: Get current twikoo-vercel version
+        id: current
+        run: |
+          CURRENT=$(node -p "require('./package.json').dependencies['twikoo-vercel']")
+          echo "version=$CURRENT" >> "$GITHUB_OUTPUT"
+          echo "Current twikoo-vercel version: $CURRENT"
+
+      - name: Update package.json
+        if: steps.latest.outputs.version != steps.current.outputs.version
+        run: npm pkg set dependencies.twikoo-vercel=${{ steps.latest.outputs.version }}
+
+      - name: Create Pull Request
+        if: steps.latest.outputs.version != steps.current.outputs.version
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore: bump twikoo-vercel to ${{ steps.latest.outputs.version }}"
+          title: "chore: bump twikoo-vercel to ${{ steps.latest.outputs.version }}"
+          body: |
+            检测到 twikoo-vercel 新版本 `${{ steps.latest.outputs.version }}`，已更新 `package.json`。
+
+            - 原版本：${{ steps.current.outputs.version }}
+            - 新版本：${{ steps.latest.outputs.version }}
+          branch: chore/update-twikoo-vercel-${{ steps.latest.outputs.version }}
+          delete-branch: true
